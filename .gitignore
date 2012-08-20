@@ -1,0 +1,11 @@
+/pom.xml
+*jar
+/lib
+/classes
+/native
+/.lein-failures
+/.lein-plugins
+/checkouts
+/.lein-deps-sum
+*.swp
+resources/public/js/main.js
