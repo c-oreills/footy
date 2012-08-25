@@ -1,4 +1,5 @@
-(ns footy.core)
+(ns footy.core
+  (:use [clojure.string :only [split trim]]))
 
 (defn main []
   (load_and_parse_url "http://www.bbc.co.uk/sport/football/championship/results"))
@@ -14,15 +15,40 @@
                        (parse_tables (aget data "results" 0)))]
     (js/$.getJSON (yql_url url) url_callback)))
 
-(defn clean_html [ext_html]
-  (let [jq_ext_html (jq ext_html)]
-    (do 
-      (. (. jq_ext_html (find "script")) (remove))
-      jq_ext_html)))
-
 (defn parse_tables [html]
-  (let [jq_html (jq html)]
-    (js/console.log (. (. jq_html (find ".table-header")) (next)))))
+  (let [headers (get_table_headers html)]
+    (jq_each headers header_to_matches)))
 
-(defn jq [html]
-  (js/$ html))
+(defn get_table_headers [html]
+  (. (jq html) (find ".table-header")))
+
+(defn header_to_matches [header]
+  (let [header (jq header)
+        date (.text header)
+        table (.next header)
+        details (.find table ".match-details")]
+      (jq_each details #(log (aget (detail_to_match % date) "strobj"))
+      )))
+
+(defn detail_to_match [table date]
+  (let
+    [table (jq table)
+     home_team (get_first_text table ".team-home")
+     away_team (get_first_text table ".team-away")
+     score (get_first_text table ".score")
+     [home_score away_score] (map int (split score #"-"))
+     finished (= (get_first_text table ".time") "Full time")
+     ]
+    {:home home_team :away away_team
+     :away_score away_score :home_score home_score
+     :date date :finished finished}))
+
+(defn get_first_text [jq_obj query]
+  (trim (.text (.first (.find jq_obj query)))))
+
+(defn jq_each [jq_obj fn]
+  (. jq_obj (each #(fn %2))))
+
+(def jq js/$)
+
+(def log js/console.log)
