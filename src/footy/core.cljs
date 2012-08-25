@@ -20,7 +20,7 @@
     (jq_each headers header_to_matches)))
 
 (defn get_table_headers [html]
-  (. (jq html) (find ".table-header")))
+  (.find (jq html) ".table-header"))
 
 (defn header_to_matches [header]
   (let [header (jq header)
