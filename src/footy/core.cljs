@@ -11,14 +11,18 @@
 
 (defn load_and_parse_url [url]
   (let [url_callback (fn [data]
-                       (parse_tables (clean_html (aget data "results" 0))))]
+                       (parse_tables (aget data "results" 0)))]
     (js/$.getJSON (yql_url url) url_callback)))
 
 (defn clean_html [ext_html]
-  (let [jq_ext_html (js/$ ext_html)]
+  (let [jq_ext_html (jq ext_html)]
     (do 
       (. (. jq_ext_html (find "script")) (remove))
       jq_ext_html)))
 
 (defn parse_tables [html]
-  (js/console.log (. (. html (find ".table-header")) (next))))
+  (let [jq_html (jq html)]
+    (js/console.log (. (. jq_html (find ".table-header")) (next)))))
+
+(defn jq [html]
+  (js/$ html))
