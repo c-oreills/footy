@@ -2,7 +2,24 @@
   (:use [clojure.string :only [split trim]]))
 
 (defn main []
-  (load_and_parse_url "http://www.bbc.co.uk/sport/football/championship/results"))
+  (doall
+    (map fetch_results LEAGUES)))
+
+(def LEAGUES
+  #{"premier-league"
+    "championship"
+    "league-one"
+    "league-two"
+    "conference"
+    "scottish-premier"
+    "scottish-first-division"
+    "scottish-second-division"
+    "scottish-third-division"})
+
+(def START_DATE (js/Date 2012 8 7))
+
+(defn results_url [league_name]
+  (str "http://www.bbc.co.uk/sport/football/" league_name "/results"))
 
 (defn yql_url [url]
   (str
@@ -10,12 +27,13 @@
     (js/encodeURIComponent url)
     "%22&format=xml&callback=?"))
 
-(defn load_and_parse_url [url]
-  (let [url_callback (fn [data]
-                       (parse_tables (aget data "results" 0)))]
+(defn fetch_results [league_name]
+  (let [url (results_url league_name)
+        url_callback (fn [data]
+                       (process_result_response (aget data "results" 0)))]
     (js/$.getJSON (yql_url url) url_callback)))
 
-(defn parse_tables [html]
+(defn process_result_response [html]
   (let [headers (get_table_headers html)]
     (jq_each headers header_to_matches)))
 
@@ -24,7 +42,7 @@
 
 (defn header_to_matches [header]
   (let [header (jq header)
-        date (.text header)
+        date (js/Date.parse (.text header))
         table (.next header)
         details (.find table ".match-details")]
       (jq_each details #(log (aget (detail_to_match % date) "strobj"))
