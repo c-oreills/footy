@@ -39,12 +39,19 @@
      [home_score away_score] (map int (split score #"-"))
      finished (= (get_first_text table ".time") "Full time")
      ]
-    {:home home_team :away away_team
-     :away_score away_score :home_score home_score
+    {:home {:name home_team :score home_score :points (points home_score away_score)}
+     :away {:name away_team :score away_score :points (points away_score home_score)}
      :date date :finished finished}))
 
 (defn get_first_text [jq_obj query]
   (trim (.text (.first (.find jq_obj query)))))
+
+(defn points [score_a score_b]
+  (+ score_a
+     (cond
+       (> score_a score_b) 3
+       (= score_a score_b) 1
+       :else 0)))
 
 (defn jq_each [jq_obj fn]
   (. jq_obj (each #(fn %2))))
