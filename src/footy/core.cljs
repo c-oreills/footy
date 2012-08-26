@@ -66,6 +66,8 @@
                             (if match (store-match match league))))]
     (jq-each details process-details)))
 
+(def not-neg? (comp not neg?))
+
 (defn detail-to-match [table date]
   (let
     [table (jq table)
@@ -80,7 +82,7 @@
      weekday (.getDay date)]
     (if (and
           (not-any? empty? [home-team away-team])
-          (<= 0 week)
+          (not-neg? week)
           (or (>= 1 weekday) (<= 5 weekday)))
       {:home {:name home-team :score home-score :points (points home-score away-score)}
        :away {:name away-team :score away-score :points (points away-score home-score)}
@@ -88,7 +90,7 @@
 
 (defn get-week [date]
   (let [diff (- date START-DATE)]
-    (if (not (neg? diff))
+    (if (not-neg? diff)
       (quot diff (* 7 24 60 60 1000))
       -1)))
 
@@ -100,12 +102,11 @@
 (defn store-team-match [current-matches-val team match]
   (let
     [week (match :week)
-     current-team-val (get current-matches-val team {})
-     current-week-val (get current-team-val week nil)]
-    (assoc current-matches-val team
-           (if (and current-week-val (< (current-week-val :date) (match :date)))
-             current-team-val
-             (assoc current-team-val week match)))))
+     current-week-val (get-in current-matches-val [team week])]
+    (if (or (not current-week-val)
+            (> (current-week-val :date) (match :date)))
+      (assoc-in current-matches-val [team week] match)
+      current-matches-val)))
 
 (defn points [score-a score-b]
   (+ score-a
