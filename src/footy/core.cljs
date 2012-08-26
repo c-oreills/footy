@@ -5,6 +5,10 @@
   (doall
     (map fetch_results LEAGUES)))
 
+(defn all_processed []
+  (do
+    (log (get-in @team_matches ["Ebbsfleet"]))))
+
 (def LEAGUES
   #{"premier-league"
     "championship"
@@ -16,7 +20,17 @@
     "scottish-second-division"
     "scottish-third-division"})
 
-(def START_DATE (js/Date 2012 8 7))
+(def unprocessed (atom (disj LEAGUES)))
+
+(defn set_processed [league]
+  (do
+    (swap! unprocessed #(disj % league)))
+    (if (empty? @unprocessed)
+      (all_processed)))
+
+(def START_DATE (new js/Date 2012 7 17))
+
+(def team_matches (atom {}))
 
 (defn results_url [league]
   (str "http://www.bbc.co.uk/sport/football/" league "/results"))
@@ -35,7 +49,9 @@
 
 (defn process_result_response [html league]
   (let [headers (get_table_headers html)]
-    (jq_each headers #(header_to_matches % league))))
+    (do
+      (jq_each headers #(header_to_matches % league))
+      (set_processed league))))
 
 (defn get_table_headers [html]
   (.find (jq html) ".table-header"))
@@ -44,27 +60,52 @@
   (let [header (jq header)
         date (js/Date.parse (.text header))
         table (.next header)
-        details (.find table ".match-details")]
-      (jq_each details #(store_match (detail_to_match % date) league))))
+        details (.find table ".match-details")
+        process_details (fn [detail]
+                          (let [match (detail_to_match detail date)]
+                            (if match (store_match match league))))]
+    (jq_each details process_details)))
 
 (defn detail_to_match [table date]
   (let
     [table (jq table)
-     home_team (get_first_text table ".team-home")
-     away_team (get_first_text table ".team-away")
-     score (get_first_text table ".score")
+     first_text (fn [query]
+                  (trim (.text (.first (.find table query)))))
+     home_team (first_text ".team-home")
+     away_team (first_text ".team-away")
+     score (first_text ".score")
      [home_score away_score] (map int (split score #"-"))
-     finished (= (get_first_text table ".time") "Full time")
-     ]
-    {:home {:name home_team :score home_score :points (points home_score away_score)}
-     :away {:name away_team :score away_score :points (points away_score home_score)}
-     :date date :finished finished}))
+     finished (= (first_text ".time") "Full time")
+     week (get_week date)
+     weekday (.getDay date)]
+    (if (and
+          (not-any? empty? [home_team away_team])
+          (<= 0 week)
+          (or (>= 1 weekday) (<= 5 weekday)))
+      {:home {:name home_team :score home_score :points (points home_score away_score)}
+       :away {:name away_team :score away_score :points (points away_score home_score)}
+       :date date :week week :finished finished})))
+
+(defn get_week [date]
+  (let [diff (- date START_DATE)]
+    (if (not (neg? diff))
+      (quot diff (* 7 24 60 60 1000))
+      -1)))
 
 (defn store_match [match league]
-  (log league match))
+  (do
+    (swap! team_matches store_team_match (get-in match [:home :name]) match)
+    (swap! team_matches store_team_match (get-in match [:away :name]) match)))
 
-(defn get_first_text [jq_obj query]
-  (trim (.text (.first (.find jq_obj query)))))
+(defn store_team_match [current_matches_val team match]
+  (let
+    [week (match :week)
+     current_team_val (get current_matches_val team {})
+     current_week_val (get current_team_val week nil)]
+    (assoc current_matches_val team
+           (if (and current_week_val (< (current_week_val :date) (match :date)))
+             current_team_val
+             (assoc current_team_val week match)))))
 
 (defn points [score_a score_b]
   (+ score_a
