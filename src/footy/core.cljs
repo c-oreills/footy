@@ -1,5 +1,6 @@
 (ns footy.core
-  (:use [clojure.string :only [split trim]]))
+  (:use [clojure.string :only [split trim]
+         footy.players :only [PLAYERS]]))
 
 (defn main []
   (doall
@@ -7,7 +8,7 @@
 
 (defn all-processed []
   (do
-    (log (get-in @team-matches ["Ebbsfleet"]))))
+    (log (map #(list %1 (get-player-points %1)) (keys footy.players.PLAYERS)))))
 
 (def LEAGUES
   #{"premier-league"
@@ -28,9 +29,30 @@
     (if (empty? @unprocessed)
       (all-processed)))
 
+(def not-neg? (comp not neg?))
+
+(defn get-week [date]
+  (let [diff (- date START-DATE)]
+    (if (not-neg? diff)
+      (quot diff (* 7 24 60 60 1000))
+      -1)))
+
 (def START-DATE (new js/Date 2012 7 17))
 
+(def CURRENT-WEEK (get-week (new js/Date)))
+
 (def team-matches (atom {}))
+
+(def player-points (atom {}))
+
+(defn get-player-points [player]
+  (let
+    [teams (footy.players.PLAYERS player)
+     get-team-points (fn [team week]
+                       (if-not (contains? @team-matches team)
+                         (log (str "Unknown team: " team) (filter #(= (first %) (first team)) (keys @team-matches))))
+                       (get-in @team-matches [team week :points team]))]
+    (reduce + (map #(get-team-points % 0) teams))))
 
 (defn results-url [league]
   (str "http://www.bbc.co.uk/sport/football/" league "/results"))
@@ -66,33 +88,28 @@
                             (if match (store-match match league))))]
     (jq-each details process-details)))
 
-(def not-neg? (comp not neg?))
-
-(defn detail-to-match [table date]
+(defn detail-to-match [detail date]
   (let
-    [table (jq table)
+    [detail (jq detail)
      first-text (fn [query]
-                  (trim (.text (.first (.find table query)))))
+                  (trim (.text (.first (.find detail query)))))
      home-team (first-text ".team-home")
      away-team (first-text ".team-away")
      score (first-text ".score")
      [home-score away-score] (map int (split score #"-"))
-     finished (= (first-text ".time") "Full time")
+     finished (= (trim (.text (.next detail))) "Full time")
      week (get-week date)
      weekday (.getDay date)]
     (if (and
           (not-any? empty? [home-team away-team])
           (not-neg? week)
-          (or (>= 1 weekday) (<= 5 weekday)))
-      {:home {:name home-team :score home-score :points (points home-score away-score)}
-       :away {:name away-team :score away-score :points (points away-score home-score)}
-       :date date :week week :finished finished})))
-
-(defn get-week [date]
-  (let [diff (- date START-DATE)]
-    (if (not-neg? diff)
-      (quot diff (* 7 24 60 60 1000))
-      -1)))
+          (or (>= 1 weekday) (<= 5 weekday))
+          finished)
+      {:home {:name home-team :score home-score}
+       :away {:name away-team :score away-score}
+       :points {home-team (points home-score away-score)
+                away-team (points away-score home-score)}
+       :date date :week week})))
 
 (defn store-match [match league]
   (do
