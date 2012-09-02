@@ -11,13 +11,12 @@
 (defn all-processed []
   (do
     (let [cols ["player" "total" "high" "low" "week"]
-          table (hiccups/html [:table
-                               [:tr (for [col cols] [:th (capitalize col)])]
-                               (for [player-points (map get-player-points (keys PLAYERS))]
-                                 [:tr (for [col cols] [:td ((keyword col) player-points)])])
-                               ])]
-      (. (jq "#player-scores") (append table))
-    )))
+          aa-data (for [player-points (map get-player-points (keys PLAYERS))]
+                     (for [col cols] ((keyword col) player-points)))
+          headers (for [col cols] {"sTitle" (capitalize col)})]
+      (. (jq "#score-table")
+         (dataTable (clj->js
+                      {"aaData" aa-data "aoColumns" headers "bPaginate" false}))))))
 
 (def LEAGUES
   #{"premier-league"
@@ -154,3 +153,23 @@
 (def jq js/$)
 
 (def log js/console.log)
+
+;; borrowed from ibdknox/jayq
+(defn map->js [m]
+  (let [out (js-obj)]
+    (doseq [[k v] m]
+      (aset out (name k) v))
+    out))
+
+(defn clj->js
+  "Recursively transforms ClojureScript maps into Javascript objects,
+other ClojureScript colls into JavaScript arrays, and ClojureScript
+keywords into JavaScript strings."
+  [x]
+  (cond
+    (string? x) x
+    (keyword? x) (name x)
+    (map? x) (.-strobj (reduce (fn [m [k v]]
+                                 (assoc m (clj->js k) (clj->js v))) {} x))
+    (coll? x) (apply array (map clj->js x))
+    :else x))
