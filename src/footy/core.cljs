@@ -142,11 +142,11 @@
         table (.next header)
         details (.find table ".match-details")
         process-details (fn [detail]
-                          (let [match (detail-to-match detail date)]
+                          (let [match (detail-to-match detail date league)]
                             (if match (store-match match league))))]
     (jq-each details process-details)))
 
-(defn detail-to-match [detail date]
+(defn detail-to-match [detail date league]
   (let
     [detail (jq detail)
      first-text (fn [query]
@@ -167,7 +167,7 @@
        :away {:name away-team :score away-score}
        :points {home-team (points home-score away-score)
                 away-team (points away-score home-score)}
-       :date date :week week})))
+       :date date :week week :league league})))
 
 (defn store-match [match league]
   (do
