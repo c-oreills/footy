@@ -1,5 +1,5 @@
 (ns footy.core
-  (:use [clojure.string :only [split trim capitalize]]
+  (:use [clojure.string :only [split trim capitalize replace]]
         [footy.players :only [PLAYERS]])
   (:require-macros [hiccups.core :as hiccups])
   (:require [hiccups.runtime :as hiccupsrt]))
@@ -10,13 +10,32 @@
 
 (defn all-processed []
   (do
-    (let [cols ["player" "total" "high" "low" "week"]
-          aa-data (for [player-points (map get-player-points (keys PLAYERS))]
-                     (for [col cols] ((keyword col) player-points)))
-          headers (for [col cols] {"sTitle" (capitalize col)})]
-      (. (jq "#score-table")
-         (dataTable (clj->js
-                      {"aaData" aa-data "aoColumns" headers "bPaginate" false}))))))
+    (draw-score-table)
+    (draw-player-detail)))
+
+(defn replace-spaces [s] (replace s #" " "-"))
+
+(defn player-detail-link [player-name]
+  (let [link-safe-name (replace-spaces player-name)]
+    (hiccups/html [:a {:href (str "#" link-safe-name)
+                       :onClick (str "footy.core.draw_player_detail('" link-safe-name "');")}
+                   player-name])))
+
+(defn draw-score-table []
+  (let [cols ["player" "total" "high" "low" "week"]
+        name-render (fn [o val] (player-detail-link val))
+        aa-data (for [player-points (map get-player-points (keys PLAYERS))]
+                  (for [col cols] ((keyword col) player-points)))
+        headers (for [col cols] {"sTitle" (capitalize col)
+                                 "fnRender" (if (= col "player") name-render)})]
+    (. (jq "#score-table")
+       (dataTable (clj->js
+                    {"aaData" aa-data "aoColumns" headers "bPaginate" false})))))
+
+(defn draw-player-detail [player-name]
+  (let [player-name (or player-name (-> js/window (aget "location") (split #"#") (second)))]
+    (if player-name
+      (. (jq "#player-detail") (html player-name)))))
 
 (def LEAGUES
   #{"premier-league"
@@ -61,13 +80,24 @@
      :week (nth week-points CURRENT-WEEK)}))
 
 (defn get-player-week-points [player week]
+  (reduce + (get-player-week-matches player week :points-only true)))
+
+(defn get-player-week-matches
+  [player week & {:keys [points-only] :or {points-only false}}]
   (let
     [teams (PLAYERS player)
-     get-team-points (fn [team]
-                       (if-not (contains? @team-matches team)
-                         (log (str "Unknown team: " team) (filter #(= (first %) (first team)) (keys @team-matches))))
-                       (get-in @team-matches [team week :points team]))]
-    (reduce + (map get-team-points teams))))
+     get-team-match (fn [team]
+                      (if-not (contains? @team-matches team)
+                        (log
+                          (str "Unknown team: " team)
+                          (filter
+                            #(= (first %) (first team))
+                            (keys @team-matches))))
+                      (let [match (get-in @team-matches [team week])]
+                        (if points-only
+                          (get-in match [:points team])
+                          match)))]
+    (map get-team-match teams)))
 
 (defn results-url [league]
   (str "http://www.bbc.co.uk/sport/football/" league "/results"))
