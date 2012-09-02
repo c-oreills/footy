@@ -154,8 +154,11 @@
      home-team (first-text ".team-home")
      away-team (first-text ".team-away")
      score (first-text ".score")
+     comment (first-text ".comment")
      [home-score away-score] (map int (split score #"-"))
-     finished (= (trim (.text (.next detail))) "Full time")
+     finished (or
+                (= (trim (.text (.next detail))) "Full time")
+                (re-find #"^Abandoned" comment))
      week (get-week date)
      weekday (.getDay date)]
     (if (and
