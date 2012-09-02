@@ -1,6 +1,8 @@
 (ns footy.core
-  (:use [clojure.string :only [split trim]
-         footy.players :only [PLAYERS]]))
+  (:use [clojure.string :only [split trim capitalize]]
+        [footy.players :only [PLAYERS]])
+  (:require-macros [hiccups.core :as hiccups])
+  (:require [hiccups.runtime :as hiccupsrt]))
 
 (defn main []
   (doall
@@ -8,7 +10,14 @@
 
 (defn all-processed []
   (do
-    (log (map #(list %1 (get-player-points %1)) (keys footy.players.PLAYERS)))))
+    (let [cols ["player" "total" "high" "low" "week"]
+          table (hiccups/html [:table
+                               [:tr (for [col cols] [:th (capitalize col)])]
+                               (for [player-points (map get-player-points (keys PLAYERS))]
+                                 [:tr (for [col cols] [:td ((keyword col) player-points)])])
+                               ])]
+      (. (jq "#player-scores") (append table))
+    )))
 
 (def LEAGUES
   #{"premier-league"
@@ -46,13 +55,20 @@
 (def player-points (atom {}))
 
 (defn get-player-points [player]
+  (let [week-points
+        (map #(get-player-week-points player %) (range (inc CURRENT-WEEK)))]
+    {:player player :weekly week-points :total (apply + week-points)
+     :high (apply max week-points) :low (apply min week-points)
+     :week (nth week-points CURRENT-WEEK)}))
+
+(defn get-player-week-points [player week]
   (let
-    [teams (footy.players.PLAYERS player)
-     get-team-points (fn [team week]
+    [teams (PLAYERS player)
+     get-team-points (fn [team]
                        (if-not (contains? @team-matches team)
                          (log (str "Unknown team: " team) (filter #(= (first %) (first team)) (keys @team-matches))))
                        (get-in @team-matches [team week :points team]))]
-    (reduce + (map #(get-team-points % 0) teams))))
+    (reduce + (map get-team-points teams))))
 
 (defn results-url [league]
   (str "http://www.bbc.co.uk/sport/football/" league "/results"))
