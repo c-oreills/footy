@@ -13,10 +13,12 @@
     (draw-score-table)
     (draw-player-detail)))
 
-(defn replace-spaces [s] (replace s #" " "-"))
+(defn link-safe [s] (replace s #" " "-"))
+
+(defn link-safe-revert [s] (replace s #"-" " "))
 
 (defn player-detail-link [player-name]
-  (let [link-safe-name (replace-spaces player-name)]
+  (let [link-safe-name (link-safe player-name)]
     (hiccups/html [:a {:href (str "#" link-safe-name)
                        :onClick (str "footy.core.draw_player_detail('" link-safe-name "');")}
                    player-name])))
@@ -33,9 +35,20 @@
                     {"aaData" aa-data "aoColumns" headers "bPaginate" false})))))
 
 (defn draw-player-detail [player-name]
-  (let [player-name (or player-name (-> js/window (aget "location") (split #"#") (second)))]
+  (let [player-name (link-safe-revert (or
+                                        player-name
+                                        (-> js/window (aget "location") (split #"#") (second))))]
     (if player-name
-      (. (jq "#player-detail") (html player-name)))))
+      (. (jq "#player-detail")
+         (html
+           (hiccups/html
+             [:p player-name]
+             (for [week (range (inc CURRENT-WEEK))]
+               [:p
+                (str "Week " (inc week))
+                [:ul
+                 (for [match (get-player-week-matches player-name week)]
+                   [:li (str match)])]])))))))
 
 (def LEAGUES
   #{"premier-league"
