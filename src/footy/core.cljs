@@ -29,10 +29,12 @@
         aa-data (for [player-points (map get-player-points (keys PLAYERS))]
                   (for [col cols] ((keyword col) player-points)))
         headers (for [col cols] {"sTitle" (capitalize col)
-                                 "fnRender" (if (= col "player") name-render)})]
+                                 "fnRender" (if (= col "player") name-render)
+                                 "asSorting" [(if (= col "player") "asc" "desc")]
+                                 })]
     (. (jq "#score-table")
        (dataTable (clj->js
-                    {"aaData" aa-data "aoColumns" headers "bPaginate" false})))))
+                    {"aaData" aa-data "aoColumns" headers "bPaginate" false "aaSorting" [[1 "desc"]]})))))
 
 (defn draw-player-detail [safe-player]
   (let [player (link-safe-revert (or
@@ -106,10 +108,13 @@
                           (filter
                             #(= (first %) (first team))
                             (keys @team-matches))))
-                      (let [match (get-in @team-matches [team week])]
-                        (if points-only
-                          (get-in match [:points team])
-                          match)))]
+                      (let [match (get-in @team-matches [team week])
+                            side (first (filter #(= team (get-in match [% :name]))
+                                                [:home :away]))]
+                        (cond
+                          points-only (get-in match [side :points])
+                          match (assoc match :side side)
+                          :else match)))]
     (map get-team-match teams)))
 
 (defn results-url [league]
@@ -170,14 +175,16 @@
           finished)
       {:home {:name home-team :score home-score :points home-points}
        :away {:name away-team :score away-score :points away-points}
-       :points {home-team home-points away-team away-points}
        :date date :week week :league league})))
 
 (defn pretty-match [match]
   (let [side-score (fn [side]
-                     (let [rev (if (= side :home) identity reverse)
-                           d (fn [f k] (format f (get-in match [side k])))]
-                       (join " " (rev [(d "(%d pts)" :points) (d "%s" :name) (d "%d" :score)]))))]
+                     (let [rev (if (= side :away) identity reverse)
+                           d (fn [f k] (format f (get-in match [side k])))
+                           style (if (= (get match :side) side)
+                                   #(hiccups/html [:b {:style "color: blue;"} %])
+                                   identity)]
+                       (style (join " " (rev [(d "(%d pts)" :points) (d "%s" :name) (d "%d" :score)])))))]
     (if match
       (str (side-score :home) " - " (side-score :away))
       "---")))
