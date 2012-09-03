@@ -1,5 +1,5 @@
 (ns footy.core
-  (:use [clojure.string :only [split trim capitalize replace]]
+  (:use [clojure.string :only [split trim capitalize replace join]]
         [footy.players :only [PLAYERS]])
   (:require-macros [hiccups.core :as hiccups])
   (:require [hiccups.runtime :as hiccupsrt]))
@@ -34,21 +34,21 @@
        (dataTable (clj->js
                     {"aaData" aa-data "aoColumns" headers "bPaginate" false})))))
 
-(defn draw-player-detail [player-name]
-  (let [player-name (link-safe-revert (or
-                                        player-name
-                                        (-> js/window (aget "location") (split #"#") (second))))]
-    (if player-name
+(defn draw-player-detail [safe-player]
+  (let [player (link-safe-revert (or
+                                   safe-player
+                                   (-> js/window (aget "location") (split #"#") (second))))]
+    (if player
       (. (jq "#player-detail")
          (html
            (hiccups/html
-             [:p player-name]
+             [:p player]
              (for [week (range (inc CURRENT-WEEK))]
                [:p
-                (str "Week " (inc week))
+                (format "Week %d - %d pts" (inc week) (get-player-week-points player week))
                 [:ul
-                 (for [match (get-player-week-matches player-name week)]
-                   [:li (str match)])]])))))))
+                 (for [match (get-player-week-matches player week)]
+                   [:li (pretty-match match)])]])))))))
 
 (def LEAGUES
   #{"premier-league"
@@ -160,17 +160,25 @@
                 (= (trim (.text (.next detail))) "Full time")
                 (re-find #"^Abandoned" comment))
      week (get-week date)
-     weekday (.getDay date)]
+     weekday (.getDay date)
+     home-points (points home-score away-score)
+     away-points (points away-score home-score)]
     (if (and
           (not-any? empty? [home-team away-team])
           (not-neg? week)
           (or (>= 1 weekday) (<= 5 weekday))
           finished)
-      {:home {:name home-team :score home-score}
-       :away {:name away-team :score away-score}
-       :points {home-team (points home-score away-score)
-                away-team (points away-score home-score)}
+      {:home {:name home-team :score home-score :points home-points}
+       :away {:name away-team :score away-score :points away-points}
+       :points {home-team home-points away-team away-points}
        :date date :week week :league league})))
+
+(defn pretty-match [match]
+  (let [side-score (fn [side]
+                     (let [rev (if (= side :home) identity reverse)
+                           d (fn [f k] (format f (get-in match [side k])))]
+                       (join " " (rev [(d "(%d pts)" :points) (d "%s" :name) (d "%d" :score)]))))]
+    (str (side-score :home) " - " (side-score :away))))
 
 (defn store-match [match league]
   (do
