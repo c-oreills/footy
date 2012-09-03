@@ -4,6 +4,6 @@
             :plugins [[lein-cljsbuild "0.2.5"]]
             :cljsbuild {
                         :builds [{:source-path "src"
-                                  :compiler {:output-to "resources/public/js/main.js"
+                                  :compiler {:output-to "out/main.js"
                                              :optimizations :whitespace
                                              :pretty-print true}}]})

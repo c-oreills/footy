@@ -8,4 +8,4 @@
 /checkouts
 /.lein-deps-sum
 *.swp
-resources/public/js/main.js
+out/main.js
