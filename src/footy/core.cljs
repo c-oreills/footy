@@ -43,7 +43,7 @@
          (html
            (hiccups/html
              [:p player]
-             (for [week (range (inc CURRENT-WEEK))]
+             (for [week (-> CURRENT-WEEK (inc) (range) (reverse))]
                [:p
                 (format "Week %d - %d pts" (inc week) (get-player-week-points player week))
                 [:ul
@@ -178,7 +178,9 @@
                      (let [rev (if (= side :home) identity reverse)
                            d (fn [f k] (format f (get-in match [side k])))]
                        (join " " (rev [(d "(%d pts)" :points) (d "%s" :name) (d "%d" :score)]))))]
-    (str (side-score :home) " - " (side-score :away))))
+    (if match
+      (str (side-score :home) " - " (side-score :away))
+      "---")))
 
 (defn store-match [match league]
   (do
