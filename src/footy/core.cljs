@@ -124,7 +124,7 @@
   (str
     "http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20html%20where%20url%3D%22"
     (js/encodeURIComponent url)
-    "%22&format=xml&callback=?"))
+    "%22%20and%20xpath%3D'%2F%2Fdiv%5B%40id%3D%22results-data%22%5D'&format=xml&callback=?"))
 
 (defn fetch-results [league]
   (let [url (results-url league)
