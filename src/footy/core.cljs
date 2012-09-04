@@ -179,12 +179,12 @@
 
 (defn pretty-match [match]
   (let [side-score (fn [side]
-                     (let [rev (if (= side :away) identity reverse)
+                     (let [order (if (= side :home) identity reverse)
                            d (fn [f k] (format f (get-in match [side k])))
                            style (if (= (get match :side) side)
                                    #(hiccups/html [:b {:style "color: blue;"} %])
                                    identity)]
-                       (style (join " " (rev [(d "(%d pts)" :points) (d "%s" :name) (d "%d" :score)])))))]
+                       (style (join " " (order [(d "(%d pts)" :points) (d "%s" :name) (d "%d" :score)])))))]
     (if match
       (str (side-score :home) " - " (side-score :away))
       "---")))
