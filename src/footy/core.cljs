@@ -10,6 +10,7 @@
 
 (defn all-processed []
   (do
+    (hide-loading)
     (draw-score-table)
     (draw-player-detail)))
 
@@ -22,6 +23,9 @@
     (hiccups/html [:a {:href (str "#" link-safe-name)
                        :onClick (str "footy.core.draw_player_detail('" link-safe-name "');")}
                    player-name])))
+
+(defn hide-loading []
+  (. (jq "#loading") (hide)))
 
 (defn draw-score-table []
   (let [cols ["player" "total" "high" "low" "week"]
