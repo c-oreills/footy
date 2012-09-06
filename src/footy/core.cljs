@@ -21,11 +21,17 @@
 (defn player-detail-link [player-name]
   (let [link-safe-name (link-safe player-name)]
     (hiccups/html [:a {:href (str "#" link-safe-name)
-                       :onClick (str "footy.core.draw_player_detail('" link-safe-name "');")}
+                       :onClick (str "footy.core.draw_player_detail('" link-safe-name "'); footy.core.scroll_to_detail()")}
                    player-name])))
 
 (defn hide-loading []
   (. (jq "#loading") (hide)))
+
+(defn scroll-to-detail []
+  (.
+    (jq "html,body")
+    (animate (clj->js {"scrollTop" (aget (. (jq "#player-detail") (offset)) "top")})
+             "slow")))
 
 (defn draw-score-table []
   (let [cols ["player" "total" "high" "low" "week"]
