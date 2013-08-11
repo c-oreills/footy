@@ -89,7 +89,7 @@
       (quot diff (* 7 24 60 60 1000))
       -1)))
 
-(def START-DATE (new js/Date 2012 7 17))
+(def START-DATE (new js/Date 2013 7 8))
 
 (def CURRENT-WEEK (get-week (new js/Date)))
 
@@ -225,24 +225,6 @@
 
 (def jq js/$)
 
-(def log js/console.log)
-
-;; borrowed from ibdknox/jayq
-(defn map->js [m]
-  (let [out (js-obj)]
-    (doseq [[k v] m]
-      (aset out (name k) v))
-    out))
-
-(defn clj->js
-  "Recursively transforms ClojureScript maps into Javascript objects,
-other ClojureScript colls into JavaScript arrays, and ClojureScript
-keywords into JavaScript strings."
-  [x]
-  (cond
-    (string? x) x
-    (keyword? x) (name x)
-    (map? x) (.-strobj (reduce (fn [m [k v]]
-                                 (assoc m (clj->js k) (clj->js v))) {} x))
-    (coll? x) (apply array (map clj->js x))
-    :else x))
+(defn log [& args]
+  (.log js/console
+        (join ", " (map pr-str args))))
